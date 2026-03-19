@@ -1,0 +1,79 @@
+name: CI Pipeline
+
+# Trigger — qué eventos disparan este workflow
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+
+  # ── Job 1: calidad y tests ─────────────────────────────
+  test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    # runs-on: qué tipo de máquina virtual usa GitHub para correr este job
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        # uses: usa una Action del marketplace de GitHub
+        # actions/checkout@v4: clona tu repo en la máquina virtual
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          # cache: 'pip' — cachea las dependencias para builds más rápidos
+
+      - name: Install dependencies
+        run: |
+          pip install -r api/requirements.txt
+        # run: ejecuta comandos bash directamente en la máquina virtual
+
+      - name: Lint with flake8
+        run: |
+          flake8 api/app.py \
+            --max-line-length=100 \
+            --ignore=E501,W503
+        # flake8: verifica que el código sigue las convenciones de Python (PEP 8)
+        # --max-line-length: líneas de hasta 100 caracteres
+        # --ignore: ignora ciertas reglas específicas
+
+      - name: Run tests with coverage
+        run: |
+          cd api && python -m pytest tests/ -v \
+            --cov=app \
+            --cov-report=term-missing
+        # --cov=app: mide qué porcentaje del código en app.py cubren los tests
+        # --cov-report=term-missing: muestra qué líneas no tienen tests
+
+  # ── Job 2: build de Docker ─────────────────────────────
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    # needs: test — este job solo corre si el job 'test' pasó
+    # si los tests fallan, el build nunca se ejecuta
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        # Buildx: versión extendida de Docker build con cache y multi-platform
+
+      - name: Build API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          push: false
+          # push: false — solo construye, no publica todavía
+          # en la semana 2 día 2 agregaremos el push a Docker Hub
+          tags: dashboard-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # cache de GitHub Actions — reutiliza capas de builds anteriores
