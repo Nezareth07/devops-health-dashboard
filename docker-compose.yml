@@ -1,0 +1,39 @@
+services:
+
+  api:
+    build: ./api
+    container_name: dashboard-api
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      - APP_VERSION=${APP_VERSION}
+      - REDIS_HOST=${REDIS_HOST}
+      - CACHE_TTL=${CACHE_TTL}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    build: ./nginx
+    container_name: dashboard-web
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dashboard-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
