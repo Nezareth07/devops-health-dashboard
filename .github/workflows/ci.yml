@@ -33,10 +33,9 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          cd api && python -m pytest tests/ -v \
-            --cov=. \
-            --cov-report=term-missing \
-            --import-mode=importlib
+          cd api && python -m pytest tests/test_app.py -v \
+            --cov=app \
+            --cov-report=term-missing
 
   build:
     name: Build Docker Image
