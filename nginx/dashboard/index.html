@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevOps Health Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #0f1117; color: #e2e8f0; min-height: 100vh; padding: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.25rem; }
+    .subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: #1e2130; border: 1px solid #2d3348; border-radius: 8px; padding: 1.25rem; }
+    .card-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .card-value { font-size: 2rem; font-weight: 500; }
+    .card-sub { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+    .bar-wrap { background: #2d3348; border-radius: 4px; height: 6px; margin-top: 0.75rem; }
+    .bar { height: 6px; border-radius: 4px; transition: width 0.5s ease; }
+    .ok   { color: #10b981; } .warn { color: #f59e0b; } .crit { color: #ef4444; }
+    .bar.ok { background: #10b981; } .bar.warn { background: #f59e0b; } .bar.crit { background: #ef4444; }
+    .status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .footer { color: #64748b; font-size: 0.75rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <span id="status-text">Connecting...</span>
+  </div>
+  <h1 style="margin-top:1rem">Health Dashboard</h1>
+  <p class="subtitle" id="hostname">Loading...</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-label">CPU Usage</div>
+      <div class="card-value" id="cpu-val">—</div>
+      <div class="bar-wrap"><div class="bar" id="cpu-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">RAM Usage</div>
+      <div class="card-value" id="ram-val">—</div>
+      <div class="card-sub" id="ram-sub"></div>
+      <div class="bar-wrap"><div class="bar" id="ram-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Disk Usage</div>
+      <div class="card-value" id="disk-val">—</div>
+      <div class="card-sub" id="disk-sub"></div>
+      <div class="bar-wrap"><div class="bar" id="disk-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Load Average</div>
+      <div class="card-value" id="load-val">—</div>
+      <div class="card-sub">1m / 5m / 15m</div>
+    </div>
+  </div>
+
+  <p class="footer" id="footer">—</p>
+
+<script>
+  function colorClass(pct) {
+    if (pct >= 90) return 'crit';
+    if (pct >= 75) return 'warn';
+    return 'ok';
+  }
+
+  function setBar(barId, valId, pct, text) {
+    const cls = colorClass(pct);
+    document.getElementById(barId).style.width = pct + '%';
+    document.getElementById(barId).className = 'bar ' + cls;
+    document.getElementById(valId).textContent = text;
+    document.getElementById(valId).className = 'card-value ' + cls;
+  }
+
+  async function fetchMetrics() {
+    try {
+      const res = await fetch('/api/metrics');
+      if (!res.ok) throw new Error('API error');
+      const d = await res.json();
+
+      document.getElementById('dot').style.background = '#10b981';
+      document.getElementById('status-text').textContent = 'Live';
+      document.getElementById('hostname').textContent =
+        d.hostname + ' — uptime: ' + d.uptime;
+
+      setBar('cpu-bar', 'cpu-val', d.cpu.usage_pct, d.cpu.usage_pct + '%');
+      setBar('ram-bar', 'ram-val', d.ram.usage_pct, d.ram.usage_pct + '%');
+      document.getElementById('ram-sub').textContent =
+        d.ram.used_mb + ' MB / ' + d.ram.total_mb + ' MB';
+      setBar('disk-bar', 'disk-val', d.disk.usage_pct, d.disk.usage_pct + '%');
+      document.getElementById('disk-sub').textContent =
+        d.disk.used + ' / ' + d.disk.total;
+      document.getElementById('load-val').textContent =
+        d.load_average['1m'] + ' / ' + d.load_average['5m'] + ' / ' + d.load_average['15m'];
+      document.getElementById('footer').textContent =
+        'Last updated: ' + new Date(d.timestamp).toLocaleTimeString() +
+        (d.cached ? ' (cached)' : ' (live)');
+
+    } catch (e) {
+      document.getElementById('dot').style.background = '#ef4444';
+      document.getElementById('status-text').textContent = 'Disconnected';
+    }
+  }
+
+  fetchMetrics();
+  setInterval(fetchMetrics, 5000);    // actualiza cada 5 segundos
+</script>
+</body>
+</html>
